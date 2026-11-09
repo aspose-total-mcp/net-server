@@ -1,0 +1,32 @@
+name: Deployment checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  configuration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell syntax and catalogs
+        run: |
+          for script in scripts/*.sh; do sh -n "$script"; done
+          python -m json.tool config/product-platform-plugins.json > /dev/null
+          python -m json.tool config/total-net.json > /dev/null
+  registration:
+    needs: configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: ./scripts/setup.sh
+      - name: Both plugin regression suites
+        run: |
+          for product in words tex; do
+            (cd "plugins/$product-net" && PYTHONPATH=src .venv/bin/python -m unittest discover -s tests -v)
+          done
